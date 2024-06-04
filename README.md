@@ -46,20 +46,9 @@ The `fixDLLPath` tool will check if the `.fixPath` field exists and if so one ca
 * It can be an **absolute filepath** like `c:\bar.dll`
 
 
+## llm (llvm compiler) support
 
-
-# coverage
-
-if the space, for the new full path dll in rdata, is not enough: remove the dll name with 00 and append it to the end of rdata field
-
-## fixPath
-
-* [ ] works for absolute path in calc.exe
-* [ ] works for relative path in calc.exe
-* [ ] works for absolute path in main.exe (self built program using a dll)
-* [ ] works for relative path in main.exe (self built program using a dll)
-
-https://www.hexacorn.com/blog/2016/12/15/pe-section-names-re-visited/
+See https://github.com/qknight/llvm-project/tree/libnix_PE-fixPath
 
 ## manual editing (010 editor)
 
