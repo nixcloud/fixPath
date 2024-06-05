@@ -1,9 +1,10 @@
 # WIP
 
-WARNING: `while the lld patch is working` and the concept in general works great i reimplemented the fixPath client with various
-implementations like `goblin`.
+WARNING: fixPath is still not commited since i'm trying various libraries for it like `goblin` and `object` and similar.
 
-expect more to come soon.
+however, `the lld patch is working` and `the concept in general works great as well`! 
+
+expect the fixPath program, the tool described here, to land soon.
 
 # fixPath
 
