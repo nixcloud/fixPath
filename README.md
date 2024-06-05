@@ -2,7 +2,10 @@
 
 `fixPath` is a tool to modify the search locations for DLLs (Dynamic Shared Objects) for [Microsoft Windows 
 Executables](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format) by rewriting parts of the binary's PE 
-header when the `.fixPath` section is present and indicates support for such rewrite.
+header when the `.fixPath` section is present and indicates support for such rewrite _without_ having to realign 
+the PE headers.
+
+fix as in:
 
 > fix - fasten (something) securely in a particular place or position.
 
@@ -32,8 +35,8 @@ Note: `fixPath` preserves the original library name and appends this information
 The `fixPath` tool relies on a custom PE extension section called `.fixPath` (a section like `.idata` or `.didata`).
 
 A patched version of the **ldd linker** or **ld linker** will create this section: 
-* when passing `-fixPath` on the command line the `.fixPath` section is created
-* when passing the `-dllname_max_size=500` on the command line, the `dllname_max_size` can be set
+* when passing `/useFixPath` on the command line the `.fixPath` section is created
+* when passing the `/fixPathSize:33` on the command line, the `fixPathSize` can be set
 
 The `fixPath` tool will check if the `.fixPath` field exists and if so one can use it to change the loader order from:
 
@@ -44,14 +47,15 @@ The `fixPath` tool will check if the `.fixPath` field exists and if so one can u
 ### .fixPath v1
 
 This `.fixPath` section contains:
-* a `version field`, `dllname_max_size` [u32], 8 bytes padding 
+* a `version field` [u32], `fixPathSize` [u32], empty spacer [u64] 
 * `idataNameTable_size` [u32]
 * array [`idataNameTable dllname`] [ascii]
-* 4 bytes padding
+* bytes padding [u32]
 * `didataNameTable_size` [u32]
 * array [`didataNameTable dllname`] [ascii],
-* 4 bytes padding
+* bytes padding [u32]
 * URL of fixPath https://github.com/nixcloud/fixPath
+* bytes padding [u32]
 
 ## LLM (LLVM compiler) support
 
@@ -61,12 +65,16 @@ Features:
 
 * [x] Reserving 300 chars dllname space
 * [x] Adding `.fixPath` section with **version** and **dllname size**
-* [ ] Adding `.fixPath` section with **dllnames** for dll loading
-* [ ] Adding `.fixPath` section with **dllnames** for delayed dll loading 
+* [x] Adding `.fixPath` section with **dllnames** for dll loading
+* [x] Adding `.fixPath` section with **dllnames** for delayed dll loading 
 * [x] Using llm options to represent defaults
-* [ ] Command line switches for cmake & similar
-* [ ] Command line switches for clang-cl
-* [ ] llm library switches
+* [x] Command line switches for cmake & similar
+* [x] Command line switches for clang-cl
+
+### CMakeLists.txt
+
+    set (CMAKE_CPP_FLAGS "-Xlinker /useFixPath -Xlinker /fixPathSize:33")
+    set (CMAKE_C_FLAGS "-Xlinker /useFixPath -Xlinker /fixPathSize:33")
 
 ## Other linkers 
 
@@ -80,6 +88,53 @@ No prototypes yet.
 # Tests
 
 The `tests/` directory contains a set of executables which were used for verifying the fixPath execution.
+
+```
+(base) PS C:\Users\joschie\Desktop\Projects\binutils-ld-experiments\build> cmake -G "Ninja" -D_CMAKE_TOOLCHAIN_PREFIX=llvm- .. && ninja --verbose && ./test_mylib.exe && objdump.exe -h .\test_mylib.exe
+-- The C compiler identification is Clang 18.1.6 with GNU-like command-line
+-- The CXX compiler identification is Clang 18.1.6 with GNU-like command-line
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: C:/Program Files/LLVM/bin/clang.exe - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: C:/Program Files/LLVM/bin/clang++.exe - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Configuring done
+-- Generating done
+-- Build files have been written to: C:/Users/joschie/Desktop/Projects/binutils-ld-experiments/build
+[1/4] C:\PROGRA~1\LLVM\bin\clang.exe  -IC:/Users/joschie/Desktop/Projects/binutils-ld-experiments/include -Xlinker /useFixPath -Xlinker /fixPathSize:333 -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -MD -MT CMakeFiles/test_mylib.dir/src/main.c.obj -MF CMakeFiles\test_mylib.dir\src\main.c.obj.d -o CMakeFiles/test_mylib.dir/src/main.c.obj -c C:/Users/joschie/Desktop/Projects/binutils-ld-experiments/src/main.c
+clang: warning: -Xlinker /useFixPath: 'linker' input unused [-Wunused-command-line-argument]
+clang: warning: -Xlinker /fixPathSize:333: 'linker' input unused [-Wunused-command-line-argument]
+[2/4] C:\PROGRA~1\LLVM\bin\clang.exe -DMYLIB_EXPORTS -Dmylib_EXPORTS -IC:/Users/joschie/Desktop/Projects/binutils-ld-experiments/include -Xlinker /useFixPath -Xlinker /fixPathSize:333 -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -MD -MT CMakeFiles/mylib.dir/src/mylib.c.obj -MF CMakeFiles\mylib.dir\src\mylib.c.obj.d -o CMakeFiles/mylib.dir/src/mylib.c.obj -c C:/Users/joschie/Desktop/Projects/binutils-ld-experiments/src/mylib.c
+clang: warning: -Xlinker /useFixPath: 'linker' input unused [-Wunused-command-line-argument]
+clang: warning: -Xlinker /fixPathSize:333: 'linker' input unused [-Wunused-command-line-argument]
+[3/4] cmd.exe /C "cd . && C:\PROGRA~1\LLVM\bin\clang.exe -fuse-ld=lld-link -nostartfiles -nostdlib -Xlinker /useFixPath -Xlinker /fixPathSize:333 -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd   -shared -o mylib.dll  -Xlinker /MANIFEST:EMBED -Xlinker /implib:mylib.lib -Xlinker /pdb:mylib.pdb -Xlinker /version:1.0 CMakeFiles/mylib.dir/src/mylib.c.obj  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -loldnames  && cd ."
+[4/4] cmd.exe /C "cd . && C:\PROGRA~1\LLVM\bin\clang.exe -fuse-ld=lld-link -nostartfiles -nostdlib -Xlinker /useFixPath -Xlinker /fixPathSize:333 -g -Xclang -gcodeview -O0 -D_DEBUG -D_DLL -D_MT -Xclang --dependent-lib=msvcrtd -Xlinker /subsystem:console CMakeFiles/test_mylib.dir/src/main.c.obj -o test_mylib.exe -Xlinker /MANIFEST:EMBED -Xlinker /implib:test_mylib.lib -Xlinker /pdb:test_mylib.pdb -Xlinker /version:0.0   mylib.lib  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 -loldnames  && cd ."
+Hello from my_function!
+
+.\test_mylib.exe:     file format pei-x86-64
+
+Sections:
+Idx Name          Size      VMA               LMA               File off  Algn
+0 .text         00002366  0000000140001000  0000000140001000  00000400  2**4
+CONTENTS, ALLOC, LOAD, READONLY, CODE
+1 .rdata        00001334  0000000140004000  0000000140004000  00002800  2**4
+CONTENTS, ALLOC, LOAD, READONLY, DATA
+2 .data         00000200  0000000140006000  0000000140006000  00003c00  2**4
+CONTENTS, ALLOC, LOAD, DATA
+3 .pdata        0000039c  0000000140007000  0000000140007000  00003e00  2**2
+CONTENTS, ALLOC, LOAD, READONLY, DATA
+4 .fixPath      0000007b  0000000140008000  0000000140008000  00004200  2**2
+CONTENTS, ALLOC, LOAD, DATA
+5 .rsrc         000001a8  0000000140009000  0000000140009000  00004400  2**2
+CONTENTS, ALLOC, LOAD, READONLY, DATA
+6 .reloc        00000030  000000014000a000  000000014000a000  00004600  2**2
+CONTENTS, ALLOC, LOAD, READONLY, DATA
+```
 
 ## Research - manual editing (010 editor / ImHex)
 
@@ -116,3 +171,8 @@ See:
 
 * https://developercommunity.visualstudio.com/idea/566616/support-rpath-for-binaries-during-development.html
 * https://stackoverflow.com/questions/107888/is-there-a-windows-msvc-equivalent-to-the-rpath-linker-flag
+
+# thanks
+
+* Martin Storsjö - <https://github.com/mstorsjo>
+* John Ericson - <https://github.com/ericson2314>
