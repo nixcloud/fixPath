@@ -1,3 +1,10 @@
+# WIP
+
+WARNING: `while the lld patch is working` and the concept in general works great i reimplemented the fixPath client with various
+implementations like `goblin`.
+
+expect more to come soon.
+
 # fixPath
 
 `fixPath` is a tool to modify the search locations for DLLs (Dynamic Shared Objects) for [Microsoft Windows 
