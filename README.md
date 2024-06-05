@@ -73,8 +73,8 @@ Features:
 
 ### CMakeLists.txt
 
-    set (CMAKE_CPP_FLAGS "-Xlinker /useFixPath -Xlinker /fixPathSize:33")
-    set (CMAKE_C_FLAGS "-Xlinker /useFixPath -Xlinker /fixPathSize:33")
+    set (CMAKE_CPP_FLAGS "-Xlinker /useFixPath -Xlinker /fixPathSize:333")
+    set (CMAKE_C_FLAGS "-Xlinker /useFixPath -Xlinker /fixPathSize:333")
 
 ## Other linkers 
 
@@ -140,8 +140,9 @@ CONTENTS, ALLOC, LOAD, READONLY, DATA
 
 Modifying main.exe's library entry (without extending the .rdata)
 
-* [x] works for absolute path in main.exe (self built program using a dll)
-* [x] works for relative path in main.exe (self built program using a dll)
+* [x] works for absolute path in main.exe
+* [x] works for relative path in main.exe
+* [x] works for relative path in main.exe to lib/lib.dll (will use lib/lib.dll over lib.dll in same dir as exe) 
 
 * [x] works with long filename : "c:\t\aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.dll"
 * [x] works with long directory: "c:\aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\t.dll" 
