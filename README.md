@@ -52,17 +52,32 @@ The `fixPath` tool will check if the `.fixPath` field exists and if so one can u
 * However, it can be a **relative filepath** like `..\foo.dll` or
 * It can be an **absolute filepath** like `c:\bar.dll`
 
-### .fixPath v1
+### .fixPath v2 (most recent)
+
+The motivation of the `.fixPath` section is to have a place with the original dll names
+in case the user needs to revert.
+
+This `.fixPath` section contains:
+* `version field` [u32], 
+* `fixPathSize` [u32]
+* `idata_name_table_size` [u32]
+* `didata_name_table_size` [u32]
+* array [`idataNameTable dllname`] [ascii]
+* array [`didataNameTable dllname`] [ascii],
+* bytes padding [u32]
+* URL of fixPath https://github.com/nixcloud/fixPath
+
+### .fixPath v1 (old)
 
 The motivation of the `.fixPath` section is to have a place with the original dll names
 in case the user needs to revert.
 
 This `.fixPath` section contains:
 * a `version field` [u32], `fixPathSize` [u32], empty spacer [u64] 
-* `idataNameTable_size` [u32]
+* `idata_name_table_size` [u32]
 * array [`idataNameTable dllname`] [ascii]
 * bytes padding [u32]
-* `didataNameTable_size` [u32]
+* `didata_name_table_size` [u32]
 * array [`didataNameTable dllname`] [ascii],
 * bytes padding [u32]
 * URL of fixPath https://github.com/nixcloud/fixPath

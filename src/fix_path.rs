@@ -1,35 +1,49 @@
-// use core::fmt::Debug;
-// use core::mem;
-//
-// use object::endian::{LittleEndian as LE, U16Bytes};
-// use object::{LittleEndian, pe, ReadRef};
-// use object::pod::Pod;
-// use object::read::{Bytes, ReadError, Result};
+use core::fmt::Debug;
+use core::mem;
 
-// use super::ImageNtHeaders;
+use object::endian::{LittleEndian as LE, U16Bytes};
+use object::{LittleEndian, pe, ReadRef, U32};
+use object::pod::Pod;
+use object::read::{Bytes, ReadError, Result};
+use object::read::pe::DataDirectories;
+use object::pod;
 
+use super::ImageNtHeaders;
+
+// object::pod::unsafe_impl_pod!(
+//     FixDataHeader
+// );
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C)]
+pub struct FixDataHeader {
+    pub version: U32<LE>,
+    pub fix_path_size: U32<LE>,
+    pub idata_name_table_size: U32<LE>,
+    pub didata_name_table_size: U32<LE>,
+}
+
+// #[derive(Debug, Clone, Copy)]
+// pub struct DataDirectories<'data> {
+//     entries: &'data [pe::ImageDataDirectory],
+// }
 //
-// pub fn read_version<'data, R: ReadRef<'data>>(
+// pub fn parse(data: &'data [u8], number: u32) -> Result<Self> {
+//     let entries = data
+//         .read_slice_at(0, number as usize)
+//         .read_error("Invalid PE number of RVA and sizes")?;
+//     Ok(DataDirectories { entries })
+// }
+
+// pub fn read_fix_path_header<'data, R: ReadRef<'data>>(
 //     data: R,
 //     offset: u32
-// ) -> object::Result<(u32)> {
-//     let hint = data
-//         .skip(offset as usize)
-//         .read::<U16Bytes<LE>>()
-//         .read_error("Missing PE import thunk hint")?
-//         .get(LE);
-//     Ok((hint))
-//
-//     // let offset = address.wrapping_sub(self.section_address);
-//     // let mut data = self.section_data;
-//     // data.skip(offset as usize)
-//     //     .read_error("Invalid PE import thunk address")?;
-//     // let hint = data
-//     //     .read::<U16Bytes<LE>>()
-//     //     .read_error("Missing PE import thunk hint")?
-//     //     .get(LE);
-//     // let name = data
-//     //     .read_string()
-//     //     .read_error("Missing PE import thunk name")?;
-//     // Ok((hint, name))
+// ) -> Result<(FixDataHeader, str)> {
+//     // let fix_path_header = data
+//     //     .read_at::<FixDataHeader>(offset as u64)
+//     //     .read_error("Invalid PE number of RVA and sizes")?;
+//     // Ok(fix_path_header)
+//     //Err("asdf")
+//     Ok(())
 // }
+
