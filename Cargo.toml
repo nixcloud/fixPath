@@ -1,0 +1,30 @@
+[package]
+name = "fixPath"
+version = "0.1.0"
+edition = "2021"
+
+[dev-dependencies]
+glob = "0.3"
+
+[dependencies]
+clap = "4.3.24"
+memmap2 = "0.9.4"
+colored = "*"
+
+#[dependencies.object]
+#version = "0.36.0"
+#features = ["write", "xcoff", "read", "all"]
+
+[dependencies.object]
+features = ["write", "xcoff", "read", "all"]
+#path = "object"
+
+git = "https://github.com/nixcloud/object.git"
+branch = "fixPath"
+
+#read = ["object/read"]
+#wasm = ["object/wasm"]
+#xcoff = ["object/xcoff"]
+#all = ["read", "write", "wasm", "xcoff"]
+#unstable-all = ["all"]
+#default = ["read"]

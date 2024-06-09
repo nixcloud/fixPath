@@ -54,6 +54,9 @@ The `fixPath` tool will check if the `.fixPath` field exists and if so one can u
 
 ### .fixPath v1
 
+The motivation of the `.fixPath` section is to have a place with the original dll names
+in case the user needs to revert.
+
 This `.fixPath` section contains:
 * a `version field` [u32], `fixPathSize` [u32], empty spacer [u64] 
 * `idataNameTable_size` [u32]
@@ -78,6 +81,8 @@ Features:
 * [x] Using llm options to represent defaults
 * [x] Command line switches for cmake & similar
 * [x] Command line switches for clang-cl
+* [ ] ImHex: add support `delayload parsing`
+* [ ] ImHex: add support `.fixPath parsing`
 
 ### CMakeLists.txt
 
