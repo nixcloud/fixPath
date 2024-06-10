@@ -27,8 +27,8 @@ fn main() {
             Arg::new("set-import")
                 .long("set-import")
                 .help("Calls the set_import function with two arguments")
-                .num_args(2)
-                .value_name("KEY VALUE")
+                .num_args(3)
+                .value_name("FILENAME OLD NEW")
                 .required(false),
         )
         .group(
@@ -40,17 +40,17 @@ fn main() {
         .get_matches();
 
     if matches.get_flag("version") {
-        println!("fixPath version 1.0");
+        println!("fixPath version 1.0"); // FIXME read from cargo.toml
     } else if let Some(filename) = matches.get_one::<String>("list-imports") {
-        process_imports(Some(filename), None);
+        process_imports(Some(filename), None, None);
     } else if let Some(values) = matches.get_many::<String>("set-import") {
         let args: Vec<&str> = values.map(|s| s.as_str()).collect();
-        process_imports(Some(args[0]), Some(args[1]));
+        process_imports(Some(args[0]), Some(args[1]), Some(args[2]));
     }
 }
 
 
-fn process_imports(old_import_path: Option<&str>, new_import_path: Option<&str>) {
+fn process_imports(old_import_path: Option<&str>, old: Option<&str>, new: Option<&str>) {
 
     let Some(in_file_path) = old_import_path else { todo!() };
 
