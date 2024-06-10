@@ -31,13 +31,10 @@ fn main() {
         )
         .arg(
             Arg::new("set-import")
-                .long("set-import")
-                .help("Calls the set_import function with two arguments") // FIXME better description
-                .num_args(3)
-                .value_name("FILENAME OLD NEW")// FIXME is printed 3 times in --help, why?!
+                .long("set-import <file> <from> <to>")
+                .help("Updates DLL bindings for <from> so it points to <to>") // FIXME better description
                 .required(false),
         )
-
         .group(
             clap::ArgGroup::new("commands")
                 .args(&["version", "list-imports", "set-import"])
@@ -54,9 +51,9 @@ fn main() {
         let args: Vec<&str> = values.map(|s| s.as_str()).collect();
         println!("set-import: {}, {}, {}", args[0], args[1], args[2]);
         // let dll_change = DLLChange { from: args[1], to: args[2]};
-        let dll_change = DllFix { 
-            dll: String::from(args[0]), 
-            from: String::from(args[1]), 
+        let dll_change = DllFix {
+            dll: String::from(args[0]),
+            from: String::from(args[1]),
             to: String::from(args[2])
         };
         process_imports(args[0], Some(dll_change));
