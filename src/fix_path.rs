@@ -1,7 +1,7 @@
 use core::fmt::Debug;
-use core::mem;
+// use core::mem;
 
-use object::endian::{LittleEndian as LE, U16Bytes};
+use object::endian::{LittleEndian as LE};
 use object::{LittleEndian, pe, ReadRef, U32};
 use object::pod::Pod;
 use object::read::{Bytes, ReadError, Result};

@@ -1,5 +1,5 @@
 mod fix_path;
-use clap::{Arg, ArgAction, Command};
+use clap::{Arg, ArgAction, Command, value_parser};
 use std::{env, fs, process};
 use colored::Colorize;
 
@@ -8,9 +8,15 @@ use object::read::coff::CoffHeader;
 use object::read::pe::{ImageNtHeaders};
 use object::read::{SectionIndex};
 
+struct DllFix {
+    dll: String,
+    from: String,
+    to: String,
+}
+
 fn main() {
     let matches = Command::new("fixPath")
-        .about("fixPath to modify DLL locations in PE executables")
+        .about(">>> fixPath to modify FS locations of linked DLLs in an PE executable <<<")
         .arg(
             Arg::new("version")
                 .long("version")
@@ -20,17 +26,18 @@ fn main() {
         .arg(
             Arg::new("list-imports")
                 .long("list-imports")
-                .help("Calls the list_imports function with a filename")
+                .help("Calls the list_imports function with a filename") // FIXME better description
                 .value_name("FILENAME")
         )
         .arg(
             Arg::new("set-import")
                 .long("set-import")
-                .help("Calls the set_import function with two arguments")
+                .help("Calls the set_import function with two arguments") // FIXME better description
                 .num_args(3)
-                .value_name("FILENAME OLD NEW")
+                .value_name("FILENAME OLD NEW")// FIXME is printed 3 times in --help, why?!
                 .required(false),
         )
+
         .group(
             clap::ArgGroup::new("commands")
                 .args(&["version", "list-imports", "set-import"])
@@ -42,17 +49,23 @@ fn main() {
     if matches.get_flag("version") {
         println!("fixPath version 1.0"); // FIXME read from cargo.toml
     } else if let Some(filename) = matches.get_one::<String>("list-imports") {
-        process_imports(Some(filename), None, None);
+        process_imports(filename, None);
     } else if let Some(values) = matches.get_many::<String>("set-import") {
         let args: Vec<&str> = values.map(|s| s.as_str()).collect();
-        process_imports(Some(args[0]), Some(args[1]), Some(args[2]));
+        println!("set-import: {}, {}, {}", args[0], args[1], args[2]);
+        // let dll_change = DLLChange { from: args[1], to: args[2]};
+        let dll_change = DllFix { 
+            dll: String::from(args[0]), 
+            from: String::from(args[1]), 
+            to: String::from(args[2])
+        };
+        process_imports(args[0], Some(dll_change));
     }
 }
 
 
-fn process_imports(old_import_path: Option<&str>, old: Option<&str>, new: Option<&str>) {
-
-    let Some(in_file_path) = old_import_path else { todo!() };
+fn process_imports(in_file_path: &str, dll_change: Option<DllFix>) {
+    println!("{}", in_file_path);
 
     let in_file = match fs::File::open(&in_file_path) {
         Ok(file) => file,
@@ -78,8 +91,8 @@ fn process_imports(old_import_path: Option<&str>, old: Option<&str>, new: Option
         }
     };
     let _out_data = match kind {
-        object::FileKind::Pe32 => process_file::<pe::ImageNtHeaders32>(in_data),
-        object::FileKind::Pe64 => process_file::<pe::ImageNtHeaders64>(in_data),
+        object::FileKind::Pe32 => process_file::<pe::ImageNtHeaders32>(in_data, dll_change),
+        object::FileKind::Pe64 => process_file::<pe::ImageNtHeaders64>(in_data, dll_change),
         _ => {
             eprintln!("Not a PE file");
             process::exit(1);
@@ -87,7 +100,8 @@ fn process_imports(old_import_path: Option<&str>, old: Option<&str>, new: Option
     };
 }
 
-fn process_file<Pe: ImageNtHeaders>(in_data: &[u8]) -> Result<(), object::Error> {
+fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
+    -> Result<(), object::Error> {
 
     // println!(
     //     "{}, {}, {}, {}, {}, {}, and some normal text.",
@@ -157,6 +171,7 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8]) -> Result<(), object::Error>
 
     /// # read delayed dllName records
     let delayed_import_table = in_data_directories.delay_load_import_table(in_data, &in_sections)?.unwrap();
+    // FIXME handle unwrap on files without delay imports
     let mut delayed_import_descriptor_iterator = delayed_import_table.descriptors()?;
     while let Some(delayed_import) = delayed_import_descriptor_iterator.next().unwrap() {
         //println!("{:?}", import);
@@ -171,12 +186,19 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8]) -> Result<(), object::Error>
         }
     }
 
+
+    let Some(change) = dll_change else {
+        return Ok(())
+    };
+
+
+    println!("{}, {}", change.from, change.to);
+    todo!();
     // FIXME do modifications
     // if let Err(err) = fs::write(&out_file_path, out_data) {
     //     eprintln!("Failed to write file '{}': {}", out_file_path, err);
     //     process::exit(1);
     // }
 
-    Ok(())
-
+    return Ok(())
 }
