@@ -1,8 +1,11 @@
 mod fix_path;
+mod cargo_env;
+use cargo_env::{VERSION, NAME};
+
 use clap::{Arg, ArgAction, Command, value_parser};
+
 use std::{env, fs, process};
 use colored::Colorize;
-
 use object::{LittleEndian, pe};
 use object::read::coff::CoffHeader;
 use object::read::pe::{ImageNtHeaders};
@@ -15,8 +18,8 @@ struct DllFix {
 }
 
 fn main() {
-    let matches = Command::new("fixPath")
-        .about(">>> fixPath to modify FS locations of linked DLLs in an PE executable <<<")
+    let matches = Command::new("{NAME}")
+        .about(">>> {NAME} to modify FS locations of linked DLLs in an PE executable <<<")
         .arg(
             Arg::new("version")
                 .long("version")
@@ -26,13 +29,17 @@ fn main() {
         .arg(
             Arg::new("list-imports")
                 .long("list-imports")
-                .help("Calls the list_imports function with a filename") // FIXME better description
-                .value_name("FILENAME")
+                .short('l')
+                .help("Lists DLL/delayed DLL imports loads of <file>, {NAME} -l test.exe")
+                .value_name("arg")
         )
         .arg(
             Arg::new("set-import")
-                .long("set-import <file> <from> <to>")
-                .help("Updates DLL bindings for <from> so it points to <to>") // FIXME better description
+                .long("set-import")
+                .short('s')
+                .help("Updates DLL <file> bindings for <from> so it points to <to>, {NAME} -s test.exe foo.dll c:\\foo.dll")
+                .value_name("arg")
+                .num_args(3)
                 .required(false),
         )
         .group(
@@ -44,7 +51,7 @@ fn main() {
         .get_matches();
 
     if matches.get_flag("version") {
-        println!("fixPath version 1.0"); // FIXME read from cargo.toml
+        println!("{NAME} version {}", VERSION);
     } else if let Some(filename) = matches.get_one::<String>("list-imports") {
         process_imports(filename, None);
     } else if let Some(values) = matches.get_many::<String>("set-import") {
