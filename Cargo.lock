@@ -178,6 +178,7 @@ dependencies = [
  "glob",
  "memmap2",
  "object",
+ "once_cell",
 ]
 
 [[package]]

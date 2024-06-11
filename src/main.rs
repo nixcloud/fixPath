@@ -1,6 +1,5 @@
-mod fix_path;
 mod cargo_env;
-use cargo_env::{VERSION, NAME};
+use cargo_env::{VERSION, get_executable_name};
 
 use clap::{Arg, ArgAction, Command, value_parser};
 
@@ -19,7 +18,7 @@ struct DllFix {
 
 fn main() {
     let matches = Command::new("{NAME}")
-        .about(">>> {NAME} to modify FS locations of linked DLLs in an PE executable <<<")
+        .about(format!(">>> {} to modify FS locations of linked DLLs in an PE executable <<<", get_executable_name()))
         .arg(
             Arg::new("version")
                 .long("version")
@@ -30,14 +29,14 @@ fn main() {
             Arg::new("list-imports")
                 .long("list-imports")
                 .short('l')
-                .help("Lists DLL/delayed DLL imports loads of <file>, {NAME} -l test.exe")
+                .help(format!("Lists DLL/delayed DLL imports loads of <file>, {} -l test.exe", get_executable_name()))
                 .value_name("arg")
         )
         .arg(
             Arg::new("set-import")
                 .long("set-import")
                 .short('s')
-                .help("Updates DLL <file> bindings for <from> so it points to <to>, {NAME} -s test.exe foo.dll c:\\foo.dll")
+                .help(format!("Updates DLL <file> bindings for <from> so it points to <to>, {} -s test.exe foo.dll c:\\foo.dll", get_executable_name()))
                 .value_name("arg")
                 .num_args(3)
                 .required(false),
@@ -51,7 +50,7 @@ fn main() {
         .get_matches();
 
     if matches.get_flag("version") {
-        println!("{NAME} version {}", VERSION);
+        println!("{} version {}", get_executable_name(), VERSION);
     } else if let Some(filename) = matches.get_one::<String>("list-imports") {
         process_imports(filename, None);
     } else if let Some(values) = matches.get_many::<String>("set-import") {
@@ -66,7 +65,6 @@ fn main() {
         process_imports(args[0], Some(dll_change));
     }
 }
-
 
 fn process_imports(in_file_path: &str, dll_change: Option<DllFix>) {
     println!("{}", in_file_path);
@@ -137,27 +135,30 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
     // * array of string idataNameTable dllname
     // * array of string didataNameTable dllname
 
-    // let fix_path_section: Option<(SectionIndex, &pe::ImageSectionHeader)> = in_sections.enumerate()
-    //     .find(|(_, section)| {
-    //         let s = String::from_utf8_lossy(&section.name);
-    //         if s == ".fixPath" {
-    //             // println!("{}", "------- .fixPath ----------".yellow());
-    //             // println!("{:0x}", section.pointer_to_raw_data.get(LittleEndian));
-    //             true
-    //         } else {
-    //             false
-    //         }
-    //     });
-    // match fix_path_section {
-    //     Some(p) => {
-    //         let offset = p.1.pointer_to_raw_data.get(LittleEndian);
-    //         println!("found {}", offset);
-    //         let fix_path_version = fix_path::read_fix_path_header(&in_data, offset);
-    //     },
-    //     None => {
-    //         println!("No .fixPath section found in PE executable!")
-    //     },
-    // }
+    let fix_path_section: Option<(SectionIndex, &pe::ImageSectionHeader)> = in_sections.enumerate()
+        .find(|(_, section)| {
+            let s = String::from_utf8_lossy(&section.name);
+            if s == ".fixPath" {
+                // println!("{}", "------- .fixPath ----------".yellow());
+                // println!("{:0x}", section.pointer_to_raw_data.get(LittleEndian));
+                true
+            } else {
+                false
+            }
+        });
+    match fix_path_section {
+        Some(p) => {
+            // let offset = p.1.pointer_to_raw_data.get(LittleEndian);
+            // println!("found {}", offset);
+            // // let fix_path_version = fix_path::read_fix_path_header(&in_data, offset);
+            // let fix_path_header = Pe::fixpath::parse(in_data, offset)?;
+            // println!("{:?}", fix_path_header);
+        },
+        None => {
+            eprintln!("No .fixPath section found in PE executable!");
+            process::exit(1);
+        },
+    }
 
     // println!("{}", fix_path_version);
     /// # read **dllName records**
@@ -167,7 +168,7 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
         let dll_name = std::str::from_utf8(import_table.name(dll_name_address)?);
         match dll_name {
             Ok(s) => {
-                println!("- (xxx) -> '{}' @ 0x{:0x}", s, dll_name_abs_address);
+                println!("- (xxx) -> '{}' (import) @ 0x{:0x}", s, dll_name_abs_address);
             },
             Err(_) => {}
         }
@@ -184,7 +185,7 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
         let dll_name = std::str::from_utf8(delayed_import_table.name(dll_name_address)?);
         match dll_name {
             Ok(s) => {
-                println!("- (xxx) -> '{}' @ 0x{:0x}", s, dll_name_abs_address);
+                println!("- (xxx) -> '{}' (delayed import) @ 0x{:0x}", s, dll_name_abs_address);
             },
             Err(_) => {}
         }
