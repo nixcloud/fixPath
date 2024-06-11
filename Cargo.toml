@@ -14,6 +14,7 @@ once_cell = "1.19.0"
 
 [dependencies.object]
 features = ["write", "xcoff", "read", "all"]
-path = "object"
-#git = "https://github.com/nixcloud/object.git"
+#path = "object"
+git = "https://github.com/nixcloud/object.git"
 #branch = "fixPath"
+rev = "6b356b4133c27807d95bcab357057317cc86ae75"

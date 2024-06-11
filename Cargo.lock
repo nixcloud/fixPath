@@ -267,6 +267,7 @@ dependencies = [
 [[package]]
 name = "object"
 version = "0.36.0"
+source = "git+https://github.com/nixcloud/object.git?rev=6b356b4133c27807d95bcab357057317cc86ae75#6b356b4133c27807d95bcab357057317cc86ae75"
 dependencies = [
  "crc32fast",
  "flate2",
