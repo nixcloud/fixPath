@@ -1,6 +1,4 @@
 use std::env;
-use std::path::Path;
-use once_cell::sync::Lazy;
 
 pub fn get_executable_name() -> String {
     env::current_exe()

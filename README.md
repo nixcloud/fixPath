@@ -6,6 +6,15 @@ however, `the lld patch is working` and `the concept in general works great as w
 
 expect the fixPath program, the tool described here, to land soon.
 
+## TODO
+
+* finish fixPath rust prototype, so it can also write using --set-import
+* bring lld upstream
+* bring object changes upstream
+* imhex 
+  * donate
+  * write fixpath section support 
+
 # fixPath
 
 `fixPath` is a tool to modify the search locations for DLLs (Dynamic Shared Objects) for [Microsoft Windows 

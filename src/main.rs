@@ -1,13 +1,14 @@
 mod cargo_env;
 use cargo_env::{VERSION, get_executable_name};
 
-use clap::{Arg, ArgAction, Command, value_parser};
+use clap::{Arg, ArgAction, Command};
 
-use std::{env, fs, process};
+use std::{fs, process};
 use colored::Colorize;
 use object::{LittleEndian, pe};
 use object::read::coff::CoffHeader;
-use object::read::pe::{ImageNtHeaders};
+use object::read::pe::{fixpath, ImageNtHeaders};
+use object::pe::{FixDataHeader};
 use object::read::{SectionIndex};
 
 struct DllFix {
@@ -55,7 +56,7 @@ fn main() {
         process_imports(filename, None);
     } else if let Some(values) = matches.get_many::<String>("set-import") {
         let args: Vec<&str> = values.map(|s| s.as_str()).collect();
-        println!("set-import: {}, {}, {}", args[0], args[1], args[2]);
+        // println!("set-import: {}, {}, {}", args[0], args[1], args[2]);
         // let dll_change = DLLChange { from: args[1], to: args[2]};
         let dll_change = DllFix {
             dll: String::from(args[0]),
@@ -67,7 +68,7 @@ fn main() {
 }
 
 fn process_imports(in_file_path: &str, dll_change: Option<DllFix>) {
-    println!("{}", in_file_path);
+    println!("target: {}", in_file_path);
 
     let in_file = match fs::File::open(&in_file_path) {
         Ok(file) => file,
@@ -126,20 +127,11 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
     let import_table = in_data_directories.import_table(in_data, &in_sections)?.unwrap();
     let mut import_descriptor_iterator = import_table.descriptors()?;
 
-    /// # generate fixPath records
-    // .fixPath section
-    // * [u32] version
-    // * [u32] fixPathSize
-    // * [u32] idata_name_table_size
-    // * [u32] didata_name_table_size
-    // * array of string idataNameTable dllname
-    // * array of string didataNameTable dllname
-
     let fix_path_section: Option<(SectionIndex, &pe::ImageSectionHeader)> = in_sections.enumerate()
         .find(|(_, section)| {
             let s = String::from_utf8_lossy(&section.name);
             if s == ".fixPath" {
-                // println!("{}", "------- .fixPath ----------".yellow());
+                println!("{}", "------- .fixPath ----------".yellow());
                 // println!("{:0x}", section.pointer_to_raw_data.get(LittleEndian));
                 true
             } else {
@@ -148,19 +140,28 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
         });
     match fix_path_section {
         Some(p) => {
-            // let offset = p.1.pointer_to_raw_data.get(LittleEndian);
-            // println!("found {}", offset);
-            // // let fix_path_version = fix_path::read_fix_path_header(&in_data, offset);
-            // let fix_path_header = Pe::fixpath::parse(in_data, offset)?;
-            // println!("{:?}", fix_path_header);
+            let offset = p.1.pointer_to_raw_data.get(LittleEndian);
+            // println!("found @ {}", offset);
+            // let fix_path_version = fix_path::read_fix_path_header(&in_data, offset);
+            let fix_path_header: FixDataHeader = fixpath::parse(in_data, offset)?;
+            let version = fix_path_header.version.get(LittleEndian);
+            let fix_path_size = fix_path_header.fix_path_size.get(LittleEndian);
+            let idata_name_table_size = fix_path_header.idata_name_table_size.get(LittleEndian);
+            let didata_name_table_size = fix_path_header.didata_name_table_size.get(LittleEndian);
+            
+            println!("version: {}", version);
+            println!("fix_path_size: {}", fix_path_size);
+            println!("idata_name_table_size: {}", idata_name_table_size);
+            println!("didata_name_table_size: {}", didata_name_table_size);
+            
         },
         None => {
             eprintln!("No .fixPath section found in PE executable!");
             process::exit(1);
         },
     }
+    println!("{}", "------- /.fixPath ----------".yellow());
 
-    // println!("{}", fix_path_version);
     /// # read **dllName records**
     while let Some(import) = import_descriptor_iterator.next().unwrap() {
         let dll_name_address: u32 = import.name.get(LittleEndian); // e74
