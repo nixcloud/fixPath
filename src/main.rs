@@ -1,20 +1,21 @@
 mod cargo_env;
 use cargo_env::{VERSION, get_executable_name};
-
 use clap::{Arg, ArgAction, Command};
-
 use std::{fs, process};
-use std::io::Error;
 use colored::Colorize;
 use object::{LittleEndian, pe};
 use object::read::coff::CoffHeader;
 use object::read::pe::{fixpath, ImageNtHeaders};
 use object::read::{SectionIndex};
 
-struct DllFix {
-    filename: String,
+struct RequestChangeSet {
     from: String,
     to: String,
+}
+
+#[derive(Debug)]
+struct MakeChangeSet {
+    dll_changes: Vec<Import>,
 }
 
 #[derive(Debug)]
@@ -80,8 +81,7 @@ fn main() {
         // println!("set-import: {}, {}, {}", args[0], args[1], args[2]);
         // let dll_change = DLLChange { from: args[1], to: args[2]};
 
-        let dll_change = DllFix {
-            filename: String::from(args[0]),
+        let dll_change = RequestChangeSet {
             from: String::from(args[1]),
             to: String::from(args[2])
         };
@@ -89,7 +89,7 @@ fn main() {
     }
 }
 
-fn process_imports(in_file_path: &str, dll_change: Option<DllFix>) {
+fn process_imports(in_file_path: &str, dll_change: Option<RequestChangeSet>) {
     println!("TARGET: \n - {}", in_file_path.yellow());
 
     let in_file = match fs::File::open(&in_file_path) {
@@ -115,7 +115,7 @@ fn process_imports(in_file_path: &str, dll_change: Option<DllFix>) {
             process::exit(1);
         }
     };
-    let _out_data = match kind {
+    let make_change_set = match kind {
         object::FileKind::Pe32 => process_file::<pe::ImageNtHeaders32>(in_data, dll_change),
         object::FileKind::Pe64 => process_file::<pe::ImageNtHeaders64>(in_data, dll_change),
         _ => {
@@ -123,24 +123,30 @@ fn process_imports(in_file_path: &str, dll_change: Option<DllFix>) {
             process::exit(1);
         }
     };
+    match make_change_set {
+        Some(c) => {
+            println!("{:?}", c)
+        },
+        None => {}
+    }
 }
 
-fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
-    -> Result<(), object::Error> {
+fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<RequestChangeSet>)
+    -> Option<MakeChangeSet> {
 
     let fix_path_data: FixPathData;
     let fix_path_section_info: FixPathSectionInfo;
 
-    let in_dos_header = pe::ImageDosHeader::parse(in_data)?;
+    let in_dos_header = pe::ImageDosHeader::parse(in_data).unwrap();
     let mut nt_headers_offset = in_dos_header.nt_headers_offset().into();
     // let in_rich_header = object::read::pe::RichHeaderInfo::parse(in_data, offset);
-    let (in_nt_headers, in_data_directories) = Pe::parse(in_data, &mut nt_headers_offset)?;
+    let (in_nt_headers, in_data_directories) = Pe::parse(in_data, &mut nt_headers_offset).unwrap();
     let in_file_header = in_nt_headers.file_header();
     // let in_optional_header = in_nt_headers.optional_header();
-    let in_sections = in_file_header.sections(in_data, nt_headers_offset)?;
+    let in_sections = in_file_header.sections(in_data, nt_headers_offset).unwrap();
 
-    let import_table = in_data_directories.import_table(in_data, &in_sections)?.unwrap();
-    let mut import_descriptor_iterator = import_table.descriptors()?;
+    let import_table = in_data_directories.import_table(in_data, &in_sections).unwrap().unwrap();
+    let mut import_descriptor_iterator = import_table.descriptors().unwrap();
 
     let fix_path_section: Option<(SectionIndex, &pe::ImageSectionHeader)> = in_sections.enumerate()
         .find(|(_, section)| {
@@ -151,15 +157,15 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
     match fix_path_section {
         Some(p) => {
             let offset = p.1.pointer_to_raw_data.get(LittleEndian);
-            let fix_path_section = fixpath::parse(in_data, offset)?;
+            let fix_path_section = fixpath::parse(in_data, offset).unwrap();
             let version = fix_path_section.header.version.get(LittleEndian);
             let fix_path_size = fix_path_section.header.fix_path_size.get(LittleEndian);
             let idata_name_table_size = fix_path_section.header.idata_name_table_size.get(LittleEndian);
             let didata_name_table_size = fix_path_section.header.didata_name_table_size.get(LittleEndian);
 
             let mut offset = (offset + 16) as usize;
-            let idata_entries = fixpath::read_import_strings(in_data, &mut offset, idata_name_table_size)?;
-            let didata_entries = fixpath::read_import_strings(in_data, &mut offset, didata_name_table_size)?;
+            let idata_entries = fixpath::read_fixpath_import_dll_names(in_data, &mut offset, idata_name_table_size).unwrap();
+            let didata_entries = fixpath::read_fixpath_import_dll_names(in_data, &mut offset, didata_name_table_size).unwrap();
 
             fix_path_section_info = FixPathSectionInfo {
                 version,
@@ -180,20 +186,20 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
     while let Some(import) = import_descriptor_iterator.next().unwrap() {
         let dll_name_address: u32 = import.name.get(LittleEndian); // e74
         let dll_name_abs_address =import_table.name_address(dll_name_address) + import_table.section_offset();
-        let dll_name = std::str::from_utf8(import_table.name(dll_name_address)?).unwrap();
+        let dll_name = std::str::from_utf8(import_table.name(dll_name_address).unwrap()).unwrap();
         imports.push(Import { dll_name: String::from(dll_name), abs_address: dll_name_abs_address });
     }
 
     // read delayed dllName records
     let mut delayed_imports: Vec<Import> = vec![];
-    let delayed_import_table = in_data_directories.delay_load_import_table(in_data, &in_sections)?.unwrap();
+    let delayed_import_table = in_data_directories.delay_load_import_table(in_data, &in_sections).unwrap().unwrap();
     // FIXME handle unwrap on files without delay imports
-    let mut delayed_import_descriptor_iterator = delayed_import_table.descriptors()?;
+    let mut delayed_import_descriptor_iterator = delayed_import_table.descriptors().unwrap();
     while let Some(delayed_import) = delayed_import_descriptor_iterator.next().unwrap() {
         //println!("{:?}", import);
         let dll_name_address: u32 = delayed_import.dll_name_rva.get(LittleEndian);
         let dll_name_abs_address = import_table.name_address(dll_name_address) + import_table.section_offset();
-        let dll_name = std::str::from_utf8(delayed_import_table.name(dll_name_address)?).unwrap();
+        let dll_name = std::str::from_utf8(delayed_import_table.name(dll_name_address).unwrap()).unwrap();
 
         delayed_imports.push(Import { dll_name: String::from(dll_name), abs_address: dll_name_abs_address });
     }
@@ -249,7 +255,7 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
         }
 
         println!();
-        return Ok(())
+        return None
     };
 
     println!();
@@ -260,26 +266,34 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
         process::exit(1);
     }
 
+    let mut make_change_set: MakeChangeSet = MakeChangeSet { dll_changes: vec![] };
+
     fn try_find_in_vec(v: &Vec<Import>, from: &String) -> Option<usize> {
         v.iter().position(|el| el.dll_name == *from)
     }
 
     match try_find_in_vec(&fix_path_data.imports, &change.from) {
         Some(i) => {
+            let abs_address = fix_path_data.imports[i].abs_address;
             println!("CHANGE IMPORTS\n - {} @ 0x{:0x} -> {}", change.from.red().strikethrough(),
-                     fix_path_data.imports[i].abs_address, change.to.green());
-            return Ok(())
+                     abs_address, change.to.green());
+            make_change_set.dll_changes.push(Import { abs_address, dll_name: change.to.clone() })
         },
         None => {}
     }
 
     match try_find_in_vec(&fix_path_data.delayed_imports, &change.from) {
         Some(i) => {
+            let abs_address = fix_path_data.imports[i].abs_address;
             println!("CHANGE DELAYED IMPORTS\n - {} @ 0x{:0x} -> {}", change.from.red().strikethrough(),
-                     fix_path_data.imports[i].abs_address, change.to.green());
-            return Ok(())
+                     abs_address, change.to.green());
+            make_change_set.dll_changes.push(Import { abs_address, dll_name: change.to })
         },
         None => {}
+    }
+
+    if make_change_set.dll_changes.len() > 0 {
+        return Some(make_change_set)
     }
 
     eprintln!("Can't find the DLL '{}' in the IMPORTS/DELAYED IMPORTS of PE file", change.from);
