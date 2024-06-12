@@ -8,7 +8,6 @@ use colored::Colorize;
 use object::{LittleEndian, pe};
 use object::read::coff::CoffHeader;
 use object::read::pe::{fixpath, ImageNtHeaders};
-use object::pe::{FixDataHeader};
 use object::read::{SectionIndex};
 
 struct DllFix {
@@ -143,17 +142,23 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
             let offset = p.1.pointer_to_raw_data.get(LittleEndian);
             // println!("found @ {}", offset);
             // let fix_path_version = fix_path::read_fix_path_header(&in_data, offset);
-            let fix_path_header: FixDataHeader = fixpath::parse(in_data, offset)?;
-            let version = fix_path_header.version.get(LittleEndian);
-            let fix_path_size = fix_path_header.fix_path_size.get(LittleEndian);
-            let idata_name_table_size = fix_path_header.idata_name_table_size.get(LittleEndian);
-            let didata_name_table_size = fix_path_header.didata_name_table_size.get(LittleEndian);
-            
+            let fix_path_section = fixpath::parse(in_data, offset)?;
+            let version = fix_path_section.header.version.get(LittleEndian);
+            let fix_path_size = fix_path_section.header.fix_path_size.get(LittleEndian);
+            let idata_name_table_size = fix_path_section.header.idata_name_table_size.get(LittleEndian);
+            let didata_name_table_size = fix_path_section.header.didata_name_table_size.get(LittleEndian);
+
+            let mut offset = (offset + 16) as usize;
+            let idata_entries = fixpath::read_import_strings(in_data, &mut offset, idata_name_table_size)?;
+            let didata_entries = fixpath::read_import_strings(in_data, &mut offset, didata_name_table_size)?;
+
             println!("version: {}", version);
             println!("fix_path_size: {}", fix_path_size);
             println!("idata_name_table_size: {}", idata_name_table_size);
+            println!("{:?}", idata_entries);
             println!("didata_name_table_size: {}", didata_name_table_size);
-            
+            println!("{:?}", didata_entries);
+
         },
         None => {
             eprintln!("No .fixPath section found in PE executable!");
@@ -162,7 +167,7 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
     }
     println!("{}", "------- /.fixPath ----------".yellow());
 
-    /// # read **dllName records**
+    // read **dllName records**
     while let Some(import) = import_descriptor_iterator.next().unwrap() {
         let dll_name_address: u32 = import.name.get(LittleEndian); // e74
         let dll_name_abs_address =import_table.name_address(dll_name_address) + import_table.section_offset();
@@ -175,7 +180,7 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<DllFix>)
         }
     }
 
-    /// # read delayed dllName records
+    // read delayed dllName records
     let delayed_import_table = in_data_directories.delay_load_import_table(in_data, &in_sections)?.unwrap();
     // FIXME handle unwrap on files without delay imports
     let mut delayed_import_descriptor_iterator = delayed_import_table.descriptors()?;
