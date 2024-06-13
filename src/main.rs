@@ -2,11 +2,17 @@ mod cargo_env;
 use cargo_env::{VERSION, get_executable_name};
 use clap::{Arg, ArgAction, Command};
 use std::{fs, process};
+use std::io::SeekFrom;
+use std::fs::OpenOptions;
+use std::io::{Seek, Write};
 use colored::Colorize;
 use object::{LittleEndian, pe};
 use object::read::coff::CoffHeader;
 use object::read::pe::{fixpath, ImageNtHeaders};
 use object::read::{SectionIndex};
+use object::FileKind;
+use std::ffi::{CString, CStr};
+use std::os::raw::c_char;
 
 struct RequestChangeSet {
     from: String,
@@ -108,24 +114,41 @@ fn process_imports(in_file_path: &str, dll_change: Option<RequestChangeSet>) {
     };
     let in_data = &*in_data;
 
-    let kind = match object::FileKind::parse(in_data) {
+    let kind = match FileKind::parse(in_data) {
         Ok(file) => file,
         Err(err) => {
             eprintln!("Failed to parse file: {}", err);
             process::exit(1);
         }
     };
+
     let make_change_set = match kind {
-        object::FileKind::Pe32 => process_file::<pe::ImageNtHeaders32>(in_data, dll_change),
-        object::FileKind::Pe64 => process_file::<pe::ImageNtHeaders64>(in_data, dll_change),
+        FileKind::Pe32 => process_file::<pe::ImageNtHeaders32>(in_data, dll_change),
+        FileKind::Pe64 => process_file::<pe::ImageNtHeaders64>(in_data, dll_change),
         _ => {
             eprintln!("Not a PE file");
             process::exit(1);
         }
     };
+
+    let mut file = OpenOptions::new().write(true).open(&in_file_path).unwrap();
+
     match make_change_set {
-        Some(c) => {
-            println!("{:?}", c)
+        Some(make_change_set) => {
+            let r = make_change_set.dll_changes.iter().for_each(|cs| {
+                match file.seek(SeekFrom::Start(cs.abs_address as u64)) {
+                    Ok(v) => {},
+                    Err(e) => { println!("{e}")}
+                }
+                // Convert Rust String into CString
+                let c_string = CString::new(cs.dll_name.clone()).expect("CString::new failed");
+
+                // Convert CString into &CStr
+                let c_str: &CStr = c_string.as_c_str();
+                // FIXME maybe we should reset all fiels to 0 which are not covered by a string
+                file.write_all(c_str.to_bytes_with_nul()).expect("Error writing make_change_set to file");
+            });
+            println!("{}", "DONE".green())
         },
         None => {}
     }
@@ -268,11 +291,11 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<RequestCh
 
     let mut make_change_set: MakeChangeSet = MakeChangeSet { dll_changes: vec![] };
 
-    fn try_find_in_vec(v: &Vec<Import>, from: &String) -> Option<usize> {
-        v.iter().position(|el| el.dll_name == *from)
+    fn try_find_in_vec(v: &Vec<String>, from: &String) -> Option<usize> {
+        v.iter().position(|el| el == from)
     }
 
-    match try_find_in_vec(&fix_path_data.imports, &change.from) {
+    match try_find_in_vec(&fix_path_data.info.idata_entries, &change.from) {
         Some(i) => {
             let abs_address = fix_path_data.imports[i].abs_address;
             println!("CHANGE IMPORTS\n - {} @ 0x{:0x} -> {}", change.from.red().strikethrough(),
@@ -282,9 +305,9 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<RequestCh
         None => {}
     }
 
-    match try_find_in_vec(&fix_path_data.delayed_imports, &change.from) {
+    match try_find_in_vec(&fix_path_data.info.didata_entries, &change.from) {
         Some(i) => {
-            let abs_address = fix_path_data.imports[i].abs_address;
+            let abs_address = fix_path_data.delayed_imports[i].abs_address;
             println!("CHANGE DELAYED IMPORTS\n - {} @ 0x{:0x} -> {}", change.from.red().strikethrough(),
                      abs_address, change.to.green());
             make_change_set.dll_changes.push(Import { abs_address, dll_name: change.to })
@@ -293,7 +316,7 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<RequestCh
     }
 
     if make_change_set.dll_changes.len() > 0 {
-        return Some(make_change_set)
+        return Some(make_change_set);
     }
 
     eprintln!("Can't find the DLL '{}' in the IMPORTS/DELAYED IMPORTS of PE file", change.from);
