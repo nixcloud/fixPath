@@ -12,7 +12,6 @@ use object::read::pe::{fixpath, ImageNtHeaders};
 use object::read::{SectionIndex};
 use object::FileKind;
 use std::ffi::{CString, CStr};
-use std::os::raw::c_char;
 
 struct RequestChangeSet {
     from: String,
@@ -21,13 +20,21 @@ struct RequestChangeSet {
 
 #[derive(Debug)]
 struct MakeChangeSet {
-    dll_changes: Vec<Import>,
+    dll_changes: Vec<ChangeImport>,
 }
 
 #[derive(Debug)]
 struct Import {
     dll_name: String,
     abs_address: u32,
+}
+
+#[derive(Debug)]
+struct ChangeImport {
+    original_dll_name: String, // fixPath entry
+    old_dll_name: String,      // the old override, same as original_dll_name usually
+    new_dll_name: String,      // the next override
+    abs_address: u32,          // where to make the override
 }
 
 #[derive(Debug)]
@@ -132,23 +139,34 @@ fn process_imports(in_file_path: &str, dll_change: Option<RequestChangeSet>) {
     };
 
     let mut file = OpenOptions::new().write(true).open(&in_file_path).unwrap();
-
     match make_change_set {
         Some(make_change_set) => {
-            let r = make_change_set.dll_changes.iter().for_each(|cs| {
+            let _ = make_change_set.dll_changes.iter().for_each(|cs| {
+                if cs.old_dll_name != cs.new_dll_name {
+ 
                 match file.seek(SeekFrom::Start(cs.abs_address as u64)) {
-                    Ok(v) => {},
+                    Ok(_) => {},
                     Err(e) => { println!("{e}")}
                 }
                 // Convert Rust String into CString
-                let c_string = CString::new(cs.dll_name.clone()).expect("CString::new failed");
+                let c_string = CString::new(cs.new_dll_name.clone()).expect("CString::new failed");
 
                 // Convert CString into &CStr
                 let c_str: &CStr = c_string.as_c_str();
                 // FIXME maybe we should reset all fiels to 0 which are not covered by a string
                 file.write_all(c_str.to_bytes_with_nul()).expect("Error writing make_change_set to file");
+                    println!("original_dll_name: {}, old_dll_name: {}, new_dll_name: {}", 
+                             cs.original_dll_name, cs.old_dll_name, cs.new_dll_name);
+                if cs.original_dll_name == cs.new_dll_name {
+                    println!("UPDATE {} @ 0x{:0x}", cs.new_dll_name,
+                                   cs.abs_address);
+                } else {
+                    println!("UPDATE {} @ 0x{:0x} -> {} (modified)", cs.old_dll_name.red().strikethrough(),
+                             cs.abs_address, cs.new_dll_name.green());
+                }
+                }
             });
-            println!("{}", "DONE".green())
+            println!("DONE");
         },
         None => {}
     }
@@ -297,20 +315,28 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<RequestCh
 
     match try_find_in_vec(&fix_path_data.info.idata_entries, &change.from) {
         Some(i) => {
+            let old_dll_name = fix_path_data.imports[i].dll_name.clone();
+            let original_dll_name = fix_path_data.imports[i].dll_name.clone();
+            let new_dll_name = change.to.clone();
             let abs_address = fix_path_data.imports[i].abs_address;
-            println!("CHANGE IMPORTS\n - {} @ 0x{:0x} -> {}", change.from.red().strikethrough(),
-                     abs_address, change.to.green());
-            make_change_set.dll_changes.push(Import { abs_address, dll_name: change.to.clone() })
+            // println!("CHANGE IMPORTS\n - {} @ 0x{:0x} -> {}", old_dll_name.red().strikethrough(),
+            //           abs_address, new_dll_name.green());
+            make_change_set.dll_changes.push(
+                ChangeImport { abs_address, original_dll_name, old_dll_name, new_dll_name })
         },
         None => {}
     }
 
     match try_find_in_vec(&fix_path_data.info.didata_entries, &change.from) {
         Some(i) => {
+            let old_dll_name = fix_path_data.delayed_imports[i].dll_name.clone();
+            let original_dll_name = fix_path_data.delayed_imports[i].dll_name.clone();
+            let new_dll_name = change.to.clone();
             let abs_address = fix_path_data.delayed_imports[i].abs_address;
-            println!("CHANGE DELAYED IMPORTS\n - {} @ 0x{:0x} -> {}", change.from.red().strikethrough(),
-                     abs_address, change.to.green());
-            make_change_set.dll_changes.push(Import { abs_address, dll_name: change.to })
+            // println!("CHANGE DELAYED IMPORTS\n - {} @ 0x{:0x} -> {}", old_dll_name.red().strikethrough(),
+            //           abs_address, new_dll_name.green());
+            make_change_set.dll_changes.push(
+                ChangeImport { abs_address, original_dll_name, old_dll_name, new_dll_name })
         },
         None => {}
     }

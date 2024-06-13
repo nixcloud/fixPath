@@ -1,18 +1,3 @@
-# WIP
-
-WARNING: fixPath is still an early prototype using `rust/object` and is incomplete. expect the fixPath program, the tool described here, to land soon.
-
-HOWEVER: `the lld patch is working` and `the concept in general works great as well on windows 10`! 
-
-## TODO
-
-* finish fixPath rust prototype, so it can also write using --set-import
-* bring lld upstream
-* bring object changes upstream
-* imhex 
-  * donate
-  * write fixpath section support 
-
 # fixPath
 
 `fixPath` is a tool to modify the path to a certain DLLs (Dynamic Shared Objects) for [Microsoft Windows 
@@ -25,15 +10,36 @@ The 'fix' in fixPath as in:
 
 > fix - fasten (something) securely in a particular place or position.
 
+
 List all imports:
 
-    $ fixPath.exe --list-imports
-     - (foo.dll)
-     - (bar.dll) -> c:\foo\bar.dll
+```
+.\fixPath.exe -l ..\..\tests\program_with_lib\build\test_mylib.exe
+TARGET:
+- ..\..\tests\program_with_lib\build\test_mylib.exe
+- fixPath version: 2
+- fix_path_size: 301
+
+IMPORTS
+- 1, mylib.dll @ 0x4274
+- 2, KERNEL32.dll @ 0x43c1
+- 3, VCRUNTIME140D.dll @ 0x450e
+- 4, ucrtbased.dll @ 0x465b
+  DELAYED IMPORTS
+- 1, delayedlib.dll @ 0x3894
+```
 
 Change the `foo.dll` import location to an absolute path:
 
-    $ fixPath.exe --set-import foo.dll c:\test\foo.dll
+```
+.\fixPath.exe -s ..\..\tests\program_with_lib\build\test_mylib.exe delayedlib.dll delayedlib.dll
+TARGET:
+ - ..\..\tests\program_with_lib\build\test_mylib.exe
+
+CHANGE DELAYED IMPORTS
+ - delayedlib.dll @ 0x3894 -> delayedlib.dll
+DONE
+```
 
 Use `fixPath` to modify the library search path:
 * **[Microsoft's linker default search path(s)](https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-search-order).**, i.e. c:\Windows\System32 and similar
@@ -235,12 +241,21 @@ See:
 * https://developercommunity.visualstudio.com/idea/566616/support-rpath-for-binaries-during-development.html
 * https://stackoverflow.com/questions/107888/is-there-a-windows-msvc-equivalent-to-the-rpath-linker-flag
 
-## outlook
+## Outlook
 
-It might be interesting to modify `lld` to write absolute library paths, i.e. c:\nix\store\...\lib.dll' into the binary by _default_ instead of 'lib.dll'
-which then gets searched by the linker resolver.
+Instead of using only fixPath it might be interesting to modify `lld` to write absolute library paths, 
+i.e. c:\nix\store\...\lib.dll' into the binary by _default_ instead of just 'lib.dll' and hope for
+the best.
 
-# thanks
+# Thanks
 
 * Martin Storsjö - <https://github.com/mstorsjo>
 * John Ericson - <https://github.com/ericson2314>
+
+## TODO
+
+* bring lld upstream
+* bring object changes upstream
+* imhex
+  * donate
+  * write fixpath section support 
