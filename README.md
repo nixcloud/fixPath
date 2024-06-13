@@ -32,12 +32,12 @@ IMPORTS
 Change the `foo.dll` import location to an absolute path:
 
 ```
-.\fixPath.exe -s ..\..\tests\program_with_lib\build\test_mylib.exe delayedlib.dll delayedlib.dll
+.\fixPath.exe -s ..\..\tests\program_with_lib\build\test_mylib.exe delayedlib.dll c:\delayedlib.dll
 TARGET:
  - ..\..\tests\program_with_lib\build\test_mylib.exe
 
 CHANGE DELAYED IMPORTS
- - delayedlib.dll @ 0x3894 -> delayedlib.dll
+ - delayedlib.dll @ 0x3894 -> c:\delayedlib.dll
 DONE
 ```
 
