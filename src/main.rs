@@ -155,8 +155,6 @@ fn process_imports(in_file_path: &str, dll_change: Option<RequestChangeSet>) {
                 let c_str: &CStr = c_string.as_c_str();
                 // FIXME maybe we should reset all fiels to 0 which are not covered by a string
                 file.write_all(c_str.to_bytes_with_nul()).expect("Error writing make_change_set to file");
-                    println!("original_dll_name: {}, old_dll_name: {}, new_dll_name: {}",
-                             cs.original_dll_name, cs.old_dll_name, cs.new_dll_name);
                 if cs.original_dll_name == cs.new_dll_name {
                     println!("UPDATE {} @ 0x{:0x}", cs.new_dll_name,
                                    cs.abs_address);
