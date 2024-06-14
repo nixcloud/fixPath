@@ -117,7 +117,6 @@ Features:
 
 * [ ] GNU LD (GNU compiler) support
 * [ ] GNU gold (GNU compiler) support
-* [ ] [mold](https://github.com/rui314/mold) support
 * [ ] Visual Studio linker support
 
 No prototypes yet.
