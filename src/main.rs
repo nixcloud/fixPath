@@ -1,17 +1,22 @@
-mod cargo_env;
-use cargo_env::{get_executable_name, VERSION};
-use clap::{Arg, ArgAction, Command};
+use std::{
+    ffi::{CStr, CString},
+    fs::{self, OpenOptions},
+    io::{Seek, SeekFrom, Write},
+    path::{Path, PathBuf},
+    process,
+};
+
+use clap::{Parser, Subcommand};
 use colored::Colorize;
-use object::read::coff::CoffHeader;
-use object::read::pe::{fixpath, ImageNtHeaders};
-use object::read::SectionIndex;
-use object::FileKind;
-use object::{pe, LittleEndian};
-use std::ffi::{CStr, CString};
-use std::fs::OpenOptions;
-use std::io::SeekFrom;
-use std::io::{Seek, Write};
-use std::{fs, process};
+use object::{
+    pe,
+    read::{
+        coff::CoffHeader,
+        pe::{fixpath, ImageNtHeaders},
+        SectionIndex,
+    },
+    FileKind, LittleEndian,
+};
 
 struct RequestChangeSet {
     from: String,
@@ -52,70 +57,68 @@ struct FixPathData {
     info: FixPathSectionInfo,
 }
 
-fn main() {
-    let matches = Command::new("{NAME}")
-        .about(format!(">>> {} to modify FS locations of linked DLLs in an PE executable <<<", get_executable_name()))
-        .arg(
-            Arg::new("version")
-                .long("version")
-                .help("Prints the version")
-                .action(ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("list-imports")
-                .long("list-imports")
-                .short('l')
-                .help(format!("Lists DLL/delayed DLL imports loads of <file>, {} -l test.exe", get_executable_name()))
-                .value_name("arg")
-        )
-        .arg(
-            Arg::new("set-import")
-                .long("set-import")
-                .short('s')
-                .help(format!("Updates DLL <file> bindings for <from> so it points to <to>, {} -s test.exe foo.dll c:\\foo.dll", get_executable_name()))
-                .value_name("arg")
-                .num_args(3)
-                .required(false),
-        )
-        .group(
-            clap::ArgGroup::new("commands")
-                .args(&["version", "list-imports", "set-import"])
-                .required(true)
-                .multiple(false),
-        )
-        .get_matches();
-
-    if matches.get_flag("version") {
-        println!("{} version {}", get_executable_name(), VERSION);
-    } else if let Some(filename) = matches.get_one::<String>("list-imports") {
-        process_imports(filename, None);
-    } else if let Some(values) = matches.get_many::<String>("set-import") {
-        let args: Vec<&str> = values.map(|s| s.as_str()).collect();
-        // println!("set-import: {}, {}, {}", args[0], args[1], args[2]);
-        // let dll_change = DLLChange { from: args[1], to: args[2]};
-
-        let dll_change = RequestChangeSet {
-            from: String::from(args[1]),
-            to: String::from(args[2]),
-        };
-        process_imports(args[0], Some(dll_change));
-    }
+/// Modify FS locations of linked DLLs in an PE executable
+#[derive(Parser)]
+#[command(version, about)]
+struct Args {
+    #[command(subcommand)]
+    command: Command,
 }
 
-fn process_imports(in_file_path: &str, dll_change: Option<RequestChangeSet>) {
-    println!("TARGET: \n - {}", in_file_path.yellow());
+#[derive(Subcommand)]
+enum Command {
+    /// Lists DLL/delayed DLL imports
+    ListImports {
+        /// Path to the executable
+        file: PathBuf,
+    },
+
+    /// Updates DLL bindings
+    SetImport {
+        /// The executable to be modified
+        exe: PathBuf,
+        /// The DLL name
+        dll_name: PathBuf,
+        /// The absolute path to the DLL
+        target_path: PathBuf,
+    },
+}
+
+fn main() {
+    match Args::parse().command {
+        Command::ListImports { file } => {
+            process_imports(&file, None);
+        }
+        Command::SetImport {
+            exe,
+            dll_name,
+            target_path,
+        } => {
+            let from = dll_name.display().to_string();
+            let to = target_path.display().to_string();
+            let dll_change = RequestChangeSet { from, to };
+            process_imports(&exe, Some(dll_change));
+        }
+    };
+}
+
+fn process_imports(in_file_path: &Path, dll_change: Option<RequestChangeSet>) {
+    println!(
+        "TARGET: \n - {}",
+        in_file_path.display().to_string().yellow()
+    );
 
     let in_file = match fs::File::open(&in_file_path) {
         Ok(file) => file,
         Err(err) => {
-            eprintln!("Failed to open file '{}': {}", in_file_path, err,);
+            eprintln!("Failed to open file '{}': {err}", in_file_path.display());
             process::exit(1);
         }
     };
     let in_data = match unsafe { memmap2::Mmap::map(&in_file) } {
         Ok(mmap) => mmap,
         Err(err) => {
-            eprintln!("Failed to map file '{}': {}", in_file_path, err,);
+            eprintln!("Failed to map file '{}': {err}", in_file_path.display());
             process::exit(1);
         }
     };
