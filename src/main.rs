@@ -217,23 +217,20 @@ fn process_file<Pe: ImageNtHeaders>(in_data: &[u8], dll_change: Option<RequestCh
             process::exit(1);
         },
     }
-
-    // read **dllName records**
+    // read imports
     let mut imports: Vec<Import> = vec![];
-    // FIXME import_descriptor_iterator could be empty
-    while let Some(import) = import_descriptor_iterator.next().unwrap() {
+    while let Ok(Some(import)) = import_descriptor_iterator.next() {
         let dll_name_address: u32 = import.name.get(LittleEndian); // e74
         let dll_name_abs_address =import_table.name_address(dll_name_address) + import_table.section_offset();
         let dll_name = std::str::from_utf8(import_table.name(dll_name_address).unwrap()).unwrap();
         imports.push(Import { dll_name: String::from(dll_name), abs_address: dll_name_abs_address });
     }
 
-    // read delayed dllName records
+    // read delayed imports
     let mut delayed_imports: Vec<Import> = vec![];
     let delayed_import_table = in_data_directories.delay_load_import_table(in_data, &in_sections).unwrap().unwrap();
     let mut delayed_import_descriptor_iterator = delayed_import_table.descriptors().unwrap();
-    // FIXME handle unwrap on files without delay imports
-    while let Some(delayed_import) = delayed_import_descriptor_iterator.next().unwrap() {
+    while let Ok(Some(delayed_import)) = delayed_import_descriptor_iterator.next() {
         //println!("{:?}", import);
         let dll_name_address: u32 = delayed_import.dll_name_rva.get(LittleEndian);
         let dll_name_abs_address = import_table.name_address(dll_name_address) + import_table.section_offset();
