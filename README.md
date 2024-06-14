@@ -29,7 +29,7 @@ IMPORTS
 - 1, delayedlib.dll @ 0x3894
 ```
 
-Change the `foo.dll` import location to an absolute path:
+Change the `delayedlib.dll` import location to an absolute path:
 
 ```
 .\fixPath.exe -s ..\..\tests\program_with_lib\build\test_mylib.exe delayedlib.dll c:\delayedlib.dll
@@ -43,8 +43,8 @@ DONE
 
 Use `fixPath` to modify the library search path:
 * **[Microsoft's linker default search path(s)](https://learn.microsoft.com/en-us/windows/win32/dlls/dynamic-link-library-search-order).**, i.e. c:\Windows\System32 and similar
-* **relative path** to the executable: lib\foo.dll
-* **absoluate path** in filesystem: c:\lib\foo.dll
+* **relative path** to the executable: lib\delayedlib.dll
+* **absoluate path** in filesystem: c:\lib\delayedlib.dll
 
 Note: `fixPath` preserves the original library name and appends this information to the `.idata` section of the PE header.
 
