@@ -10,11 +10,10 @@ The 'fix' in fixPath as in:
 
 > fix - fasten (something) securely in a particular place or position.
 
-
 List all imports:
 
 ```
-.\fixPath.exe -l ..\..\tests\program_with_lib\build\test_mylib.exe
+.\fixPath.exe list-imports ..\..\tests\program_with_lib\build\test_mylib.exe
 TARGET:
 - ..\..\tests\program_with_lib\build\test_mylib.exe
 - fixPath version: 2
@@ -32,7 +31,7 @@ IMPORTS
 Change the `delayedlib.dll` import location to an absolute path:
 
 ```
-.\fixPath.exe -s ..\..\tests\program_with_lib\build\test_mylib.exe delayedlib.dll c:\delayedlib.dll
+.\fixPath.exe set-import ..\..\tests\program_with_lib\build\test_mylib.exe delayedlib.dll c:\delayedlib.dll
 TARGET:
  - ..\..\tests\program_with_lib\build\test_mylib.exe
 
