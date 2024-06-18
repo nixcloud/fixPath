@@ -4,3 +4,7 @@
 
  - set-import / get-imports as subcommands instead of -s / --set-import and -l / --list-imports
  - refactorings and better error checking
+
+## v0.1.0 
+
+ - initial release and POC

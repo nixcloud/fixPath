@@ -212,6 +212,11 @@ this needs checking still:
 * [ ] works with relative path ../zxxialnsgv0ahms5d35sivqzxqg1kicf-libiec61883-1.2.0\lib\lib.dll to symlinked library pointing to C:\nix\store\zxxialnsgv0ahms5d35sivqzxqg1kicf-libiec61883-1.2.0\lib\lib.dll
 * [ ] works with relative path to symlinked library, which points also to a relative path ... and so on
 
+`/nix/store` as path:
+
+* [x] one can use fixPath --set-import test.exe mylib.dll /nix/store/zxxialnsgv0ahms5d35sivqzxqg1kicf-libiec61883-1.2.0/lib/mylib.dll and executed in a shell from c: this will work (form d: it won't)
+  * A single leading slash means "whichever drive is the current one". There is no "drive root" like the Unix "/" on Windows. If C: is the active drive than "/" is C:\, if D: is the active drive than "/" is D:\ which is why it's considered relative on Windows.
+
 # FAQ
 
 ## What motivates `fixPath`?
