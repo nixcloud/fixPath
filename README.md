@@ -234,6 +234,10 @@ Modifying _dll paths of arbitrary executables_ proved way too complicated and of
 programs, because the required relocations of sections and addresses inside the sections is undocumented
 and not wanted.
 
+## How to build patched lld?
+
+https://discourse.llvm.org/t/build-lld-on-windows-10-using-ninja-llvm-18-1-6-cmake/79318/5
+
 ## fixPath vs. rpath differences
 
 * 'fixPath' will force the Windows loader to use a 'fixed' down version of the library in an absolute or relative path
